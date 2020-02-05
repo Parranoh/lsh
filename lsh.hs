@@ -18,6 +18,7 @@ data Command
   | Eager L.LExpr
   | Print [String]
   | Reduce L.LExpr
+  | Test L.LExpr L.LExpr
   | Unchurch L.LExpr
   | Help
   | Quit
@@ -46,7 +47,7 @@ main = do
               "c" -> return $ map H.C.simpleCompletion ["c", "cw", "cn"]
               "cw" -> return [H.C.simpleCompletion "cw"]
               "cn" -> return [H.C.simpleCompletion "cn"]
-              (cmd:_) -> if cmd `elem` "clnprhqeu"
+              (cmd:_) -> if toLower cmd `elem` "clnprhqeut"
                          then return [H.C.simpleCompletion [cmd]]
                          else return cmds
             _  -> do
@@ -56,7 +57,7 @@ main = do
               return comps)
         cmds :: [H.C.Completion]
         cmds = map H.C.simpleCompletion $
-          ["c","cw","cn","l","n","e","p","r","u","h","q"]
+          ["c","cw","cn","l","n","e","p","r","t","u","h","q"]
 
     startup :: H.InputT StateM ()
     startup = do
@@ -113,6 +114,11 @@ parse (cmd:args) = case toLower cmd of
       (Left "Error: Malformed lambda in `r` command")
       (Right . Reduce)
     . readMaybe $ args
+  't' -> let (s1,s2) = fmap (dropWhile (== ',')) . break (== ',') $ args
+         in case (readMaybe s1, readMaybe s2) of
+           (Nothing, _) -> Left "Error: Malformed lambda in lhs of `t' command"
+           (_, Nothing) -> Left "Error: Malformed lambda in rhs of `t' command"
+           (Just e1, Just e2) -> Right $ Test e1 e2
   'u' -> maybe
       (Left "Error: Malformed lambda in `u` command")
       (Right . Unchurch)
@@ -151,6 +157,10 @@ exec d (NF e) =
 exec d (Eager e) =
   let d' = L.insertIt (L.toNf d e) d
   in (d', L.makeEager d e)
+exec d (Test e1 e2) = (d, if e1' == e2' then "Equal" else "Not equal")
+  where
+    e1' = L.toNf d e1
+    e2' = L.toNf d e2
 exec d (Unchurch e) = case L.unchurch d e of
   Just e' -> let d' = L.insertIt e' d
              in (d', show e')

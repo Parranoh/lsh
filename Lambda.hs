@@ -29,7 +29,17 @@ import qualified Data.Map.Strict as M
 data LExpr = Var String
            | App LExpr LExpr
            | Lam String LExpr
-           deriving Eq
+
+-- equivalence mod α conversion
+instance Eq LExpr where
+  Var v1      == Var v2      = v1  == v2
+  l1 `App` r1 == l2 `App` r2 = l1  == l2 && r1 == r2
+  Lam v1 e1   == Lam v2 e2   = e1' == e2'
+    where
+      v'  = newVar "" (free e1 `S.union` free e2)
+      e1' = subst (Var v') v1 e1
+      e2' = subst (Var v') v2 e2
+  _           == _           = False
 
 instance Show LExpr where
   showsPrec _ (Var v) = showString v
@@ -274,7 +284,7 @@ applicativeOrder d = go
     go (((Var "If" `App` Var "True")  `App` t) `App` _) = (Delta, t)
     go (((Var "If" `App` Var "False") `App` _) `App` e) = (Delta, e)
 
--- variable definitions
+    -- variable definitions
     go (Var cn)
       | churchNum cn = (Definition cn, church n)
       where
