@@ -15,6 +15,7 @@ data Command
   = Check Form L.LExpr
   | Let String L.LExpr
   | NF L.LExpr
+  | Eager L.LExpr
   | Print [String]
   | Reduce L.LExpr
   | Unchurch L.LExpr
@@ -102,6 +103,10 @@ parse (cmd:args) = case toLower cmd of
       (Left "Error: Malformed lambda in `n` command")
       (Right . NF)
     . readMaybe $ args
+  'e' -> maybe
+      (Left "Error: Malformed lambda in `e` command")
+      (Right . Eager)
+    . readMaybe $ args
   'p' -> Right . Print . words $ args
   'r' -> maybe
       (Left "Error: Malformed lambda in `r` command")
@@ -142,10 +147,14 @@ exec d (Reduce e) =
 exec d (NF e) =
   let d' = L.insertIt (L.toNf d e) d
   in (d', L.makeNf d e)
-exec d (Unchurch e) =
-  let d' = L.insertIt (L.toUnchurch d e) d
-  in (d', L.makeUnchurch d e)
-exec d (Let v e)  = case L.insert v e d of
+exec d (Eager e) =
+  let d' = L.insertIt (L.toNf d e) d
+  in (d', L.makeEager d e)
+exec d (Unchurch e) = case L.unchurch d e of
+  Just e' -> let d' = L.insertIt e' d
+             in (d', show e')
+  _       -> (d, "Error: Result is not a Church numeral")
+exec d (Let v e) = case L.insert v e d of
   Left err -> (d, err)
   Right d' -> let Just e' = L.lookup v d'
                   d''     = L.insertIt e' d'

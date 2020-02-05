@@ -6,8 +6,8 @@ module Lambda
 , makeWhnf
 , toWhnf
 , isWhnf
-, makeUnchurch
-, toUnchurch
+, makeEager
+, unchurch
 , LDict ()
 , insert
 , insertIt
@@ -22,6 +22,7 @@ module Lambda
 ) where
 
 import Prelude hiding (lookup, filter)
+import Data.Bifunctor (first)
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
@@ -178,9 +179,6 @@ substAlpha m x = go
 church :: Int -> LExpr
 church n = Lam "f" $ Lam "x" $ iterate (Var "f" `App`) (Var "x") !! n
 
-unchurch :: LExpr -> LExpr
-unchurch e = e `App` (Var "+" `App` Var "1") `App` Var "0"
-
 data Reduction
   = None
   | Start
@@ -245,12 +243,44 @@ normalOrder d = go
       (rl, l')  -> (rl, l' `App` r)
     go (Lam v e) = Lam v <$> go e
 
+applicativeOrder :: LDict -> LExpr -> (Reduction, LExpr)
+applicativeOrder d = go
+  where
+    -- variable definitions
+    go (Var cn)
+      | churchNum cn = (Definition cn, church n)
+      where
+        n :: Int
+        n = read . tail $ cn
+    go (Var v) = case me of
+      Just e -> (Definition v, e)
+      _      -> (None, Var v)
+      where
+        me = lookup v d
+
+    -- other
+    go (l@(Lam v lb) `App` r) = case rr of
+      None -> if al
+              then (Alpha, Lam v l' `App` r)
+              else (Beta, l')
+      _    -> (rr, l `App` r')
+      where
+        (rr, r') = go r
+        (al, l') = substAlpha r v lb
+    go (l `App` r) = case go l of
+      (None, _) -> (l `App`) <$> go r
+      (rl, l')  -> (rl, l' `App` r)
+    go (Lam v e) = Lam v <$> go e
+
 (>>#) :: (a,b) -> (b -> (a,b)) -> (a,b)
 (_,x) >># f = f x
 infixl 1 >>#
 
 reduce :: LDict -> LExpr -> [(Reduction, LExpr)]
 reduce d = iterate (>># normalOrder d) . (,) Start
+
+reduceEager :: LDict -> LExpr -> [(Reduction, LExpr)]
+reduceEager d = iterate (>># applicativeOrder d) . (,) Start
 
 isWhnf :: LDict -> LExpr -> Bool
 isWhnf d = go
@@ -303,11 +333,16 @@ toNf d = snd . last . makeNfList d
 makeNfList :: LDict -> LExpr -> [(Reduction, LExpr)]
 makeNfList d = takeWhile ((/= None) . fst) . reduce d
 
-toUnchurch :: LDict -> LExpr -> LExpr
-toUnchurch d = toWhnf d . unchurch
+makeEagerList :: LDict -> LExpr -> [(Reduction, LExpr)]
+makeEagerList d = takeWhile ((/= None) . fst) . reduceEager d
 
-makeUnchurchList :: LDict -> LExpr -> [(Reduction, LExpr)]
-makeUnchurchList d = makeWhnfList d . unchurch
+unchurch :: LDict -> LExpr -> Maybe LExpr
+unchurch d e
+  | number ue = Just . read $ 'C' : ue
+  | otherwise = Nothing
+  where
+    e' = e `App` (Var "+" `App` Var "1") `App` Var "0"
+    ue = show . toWhnf d $ e'
 
 takeUntil :: (a -> Bool) -> [a] -> [a]
 takeUntil p = go
@@ -315,6 +350,13 @@ takeUntil p = go
     go [] = []
     go (x:xs) | p x = [x]
               | otherwise = x : go xs
+
+breakOne :: (a -> Bool) -> [a] -> ([a], [a])
+breakOne p = go
+  where
+    go [] = ([], [])
+    go (x:xs) | p x = ([x], xs)
+              | otherwise = first (x:) $ go xs
 
 newtype RedList = RedList [(Reduction, LExpr)]
 
@@ -340,11 +382,33 @@ instance Show RedList where
       showRed _              = showChar '\t'
 
 makeNf :: LDict -> LExpr -> String
-makeNf d = show . RedList . makeNfList d
+makeNf d e = shows (RedList notWhnf) .
+                showString "\n\t=== Reached WHNF ===" .
+                (
+                  if null whnf
+                  then id
+                  else showChar '\n'
+                ) .
+                shows (RedList whnf) $
+                ""
+  where
+    (notWhnf, whnf) = breakOne (isWhnf d . snd) . makeNfList d $ e
+
 makeWhnf :: LDict -> LExpr -> String
 makeWhnf d = show . RedList . makeWhnfList d
-makeUnchurch :: LDict -> LExpr -> String
-makeUnchurch d = show . RedList . makeUnchurchList d
+
+makeEager :: LDict -> LExpr -> String
+makeEager d e = shows (RedList notWhnf) .
+                showString "\n\t=== Reached WHNF ===" .
+                (
+                  if null whnf
+                  then id
+                  else showChar '\n'
+                ) .
+                shows (RedList whnf) $
+                ""
+  where
+    (notWhnf, whnf) = breakOne (isWhnf d . snd) . makeEagerList d $ e
 
 newtype LDict = LDict (M.Map String LExpr)
 
