@@ -46,7 +46,7 @@ main = do
               "c" -> return $ map H.C.simpleCompletion ["c", "cw", "cn"]
               "cw" -> return [H.C.simpleCompletion "cw"]
               "cn" -> return [H.C.simpleCompletion "cn"]
-              (cmd:_) -> if cmd `elem` "clnprhq"
+              (cmd:_) -> if cmd `elem` "clnprhqeu"
                          then return [H.C.simpleCompletion [cmd]]
                          else return cmds
             _  -> do
@@ -55,7 +55,8 @@ main = do
                   comps = map H.C.simpleCompletion fittingVars
               return comps)
         cmds :: [H.C.Completion]
-        cmds = map H.C.simpleCompletion ["c","cw","cn","l","n","p","r","h","q"]
+        cmds = map H.C.simpleCompletion $
+          ["c","cw","cn","l","n","e","p","r","u","h","q"]
 
     startup :: H.InputT StateM ()
     startup = do

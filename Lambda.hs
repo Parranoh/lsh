@@ -246,7 +246,35 @@ normalOrder d = go
 applicativeOrder :: LDict -> LExpr -> (Reduction, LExpr)
 applicativeOrder d = go
   where
-    -- variable definitions
+    -- delta reducible expressions
+    go ((Var "+" `App` Var a) `App` Var b)
+      | number a && number b =
+          (Delta, Var . show $ (read a + read b :: Integer))
+    go ((Var "-" `App` Var a) `App` Var b)
+      | number a && number b =
+          (Delta, Var . show $ (read a - read b :: Integer))
+    go ((Var "*" `App` Var a) `App` Var b)
+      | number a && number b =
+          (Delta, Var . show $ (read a * read b :: Integer))
+    go ((Var "×" `App` Var a) `App` Var b)
+      | number a && number b =
+          (Delta, Var . show $ (read a * read b :: Integer))
+    go ((Var "/" `App` Var a) `App` Var b)
+      | number a && number b =
+          (Delta, Var . show $ (read a `div` read b :: Integer))
+    go ((Var "÷" `App` Var a) `App` Var b)
+      | number a && number b =
+          (Delta, Var . show $ (read a `div` read b :: Integer))
+    go ((Var "=" `App` Var a) `App` Var b)
+      | number a && number b = (Delta, Var . show $ a == b)
+    go ((Var "<" `App` Var a) `App` Var b)
+      | number a && number b = (Delta, Var . show $ a < b)
+    go ((Var ">" `App` Var a) `App` Var b)
+      | number a && number b = (Delta, Var . show $ a > b)
+    go (((Var "If" `App` Var "True")  `App` t) `App` _) = (Delta, t)
+    go (((Var "If" `App` Var "False") `App` _) `App` e) = (Delta, e)
+
+-- variable definitions
     go (Var cn)
       | churchNum cn = (Definition cn, church n)
       where
