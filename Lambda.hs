@@ -68,13 +68,18 @@ instance Read LExpr where
                           let e = foldr Lam body vars]) p
 
                 ++ readParen False
-                   (\r -> [(Var v,s) |
+                   (\r -> [(Var var,s) |
                           (v@(_:_),s) <- lex r,
-                          validToken v]) p
+                          let var = readNum v,
+                          validToken var]) p
 
     where
       lam_prec = 0
       app_prec = 1
+
+      readNum :: String -> String
+      readNum ('_':cs@(_:_)) = '-':cs
+      readNum cs             = cs
 
       readAppList :: ReadS [LExpr]
       readAppList r = do
@@ -120,7 +125,8 @@ symbol :: String -> Bool
 symbol v = binOp v || boolean v || churchNum v || v `elem` [":","If","It"]
 
 number :: String -> Bool
-number = all (`elem` ['0'..'9'])
+number ""     = False
+number (c:cs) = x `elem` "-" ++ ['0'..'9'] && all (`elem` ['0'..'9']) xs
 
 expr :: LExpr
 expr = read "\\x z -> y (\\x -> x y) (\\y -> x y)"
