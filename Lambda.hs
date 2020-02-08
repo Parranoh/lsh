@@ -122,11 +122,11 @@ churchNum ('C':n@(_:_)) = number n
 churchNum _             = False
 
 symbol :: String -> Bool
-symbol v = binOp v || boolean v || churchNum v || v `elem` [":","If","It"]
+symbol v = binOp v || boolean v || churchNum v || v `elem` [":","If","It","Y","S","K","I"]
 
 number :: String -> Bool
 number ""     = False
-number (c:cs) = x `elem` "-" ++ ['0'..'9'] && all (`elem` ['0'..'9']) xs
+number (c:cs) = c `elem` "-" ++ ['0'..'9'] && all (`elem` ['0'..'9']) cs
 
 expr :: LExpr
 expr = read "\\x z -> y (\\x -> x y) (\\y -> x y)"
@@ -236,6 +236,28 @@ normalOrder d = go
     go (((Var "If" `App` Var "False") `App` _) `App` e) = (Delta, e)
 
     -- variable definitions
+    go (Var "Y") = (Definition "Y",
+      Lam "x" $ (
+          Lam "y" $
+              Var "x"
+            `App` (
+                Var "y"
+              `App`
+                Var "y"))
+        `App` (
+          Lam "y" $
+               Var "x"
+            `App` (
+                Var "y"
+              `App`
+                Var "y")))
+    go (Var "S") = (Definition "S",
+      Lam "f" $ Lam "g" $ Lam "x" $
+          (Var "f" `App` Var "x")
+        `App`
+          (Var "g" `App` Var "x"))
+    go (Var "K") = (Definition "K", Lam "x" $ Lam "_" $ Var "x")
+    go (Var "I") = (Definition "I", Lam "x" $ Var "x")
     go (Var cn)
       | churchNum cn = (Definition cn, church n)
       where
@@ -355,11 +377,10 @@ isWhnf d = go
       | churchNum cn = False
 
     -- beta reducible
-    go (Var v)   = notMember v d
+    go (Var v)   = notMember v d && notElem v ["Y","S","K","I"]
     go (App l _) = case l of
-      Var v   -> notMember v d
-      App _ _ -> go l
       Lam _ _ -> False
+      _       -> go l
     go (Lam _ _) = True
 
 toWhnf :: LDict -> LExpr -> LExpr
