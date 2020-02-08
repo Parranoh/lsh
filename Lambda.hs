@@ -62,7 +62,7 @@ instance Read LExpr where
                    (\r -> [(e,u) |
                           ("\\",s) <- lex r,
                           (vs,'-':'>':t) <- [span (/= '-') s],
-                          let vars = words vs,
+                          vars@(_:_) <- [words vs],
                           all validVar vars,
                           (body,u) <- readsPrec (lam_prec+1) t,
                           let e = foldr Lam body vars]) p
