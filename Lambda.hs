@@ -148,11 +148,7 @@ free (Var v)
   | number v  = S.empty
   | otherwise = S.singleton v
 free (App e e') = free e `S.union` free e'
-free (Lam v e)
-  | v `S.member` fe = S.delete v fe
-  | otherwise       = fe
-  where
-    fe = free e
+free (Lam v e) = S.delete v . free $ e
 
 bound :: LExpr -> S.Set String
 bound = snd . freeBound
