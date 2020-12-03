@@ -187,7 +187,7 @@ substAlpha m x = go
     go (Lam v e) | v == x = (False, Lam v e)
                  | x `S.notMember` free e = (False, Lam v e)
                  | v `S.notMember` free m = (ae, Lam v e')
-                 | otherwise = let z = newVar v (free m)
+                 | otherwise = let z = newVar v (free m `S.union` free e)
                                in (True, Lam z (subst (Var z) v e))
                  where
                    (ae, e') = go e
