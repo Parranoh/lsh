@@ -165,7 +165,7 @@ subst m x = go
     go (Lam v e) | v == x    = Lam v e
                  | x `S.notMember` free e = Lam v e
                  | v `S.notMember` free m = Lam v (go e)
-                 | otherwise = let z = newVar v (free m)
+                 | otherwise = let z = newVar v (free m `S.union` free e)
                                in go (Lam z (subst (Var z) v e))
 
 substAlpha :: LExpr -> String -> LExpr -> (Bool, LExpr)
